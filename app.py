@@ -28,14 +28,26 @@ feature_extractor = keras.Sequential([
 rf_model = joblib.load("dog_skin_rf_model.pkl")
 
 # ---------------------------
-# 3. Define class names (must match training exactly!)
+# 3. Define class names
 # ---------------------------
-class_names = ['demodicosis','Dermatitis', 'Fungal_infections',  'Healthy', 'Hypersensitivity','ringworm']  
+class_names = ['demodicosis','Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity','ringworm']  
 
 # ---------------------------
-# 4. Streamlit UI
+# 4. Add Disease Information Dictionary
 # ---------------------------
-st.title("Dog Skin Disease Classifier (CNN + Random Forest)")
+disease_info = {
+    "demodicosis": "Demodicosis (mange) is caused by Demodex mites. Symptoms include hair loss, redness, and skin scaling. Treatment often involves medicated baths and oral medications.",
+    "Dermatitis": "Dermatitis is skin inflammation. Symptoms include itching, redness, and rashes. Treatment may include antihistamines, medicated shampoos, or antibiotics if infected.",
+    "Fungal_infections": "Fungal infections often cause circular patches of hair loss, itching, and scaling. Treatment includes antifungal creams, shampoos, and oral medications.",
+    "Healthy": "The dog's skin looks healthy with no visible signs of infection or irritation. Maintain proper hygiene and nutrition to prevent diseases.",
+    "Hypersensitivity": "Hypersensitivity (allergic reaction) can cause itching, redness, and swelling. Common causes are food, fleas, or environmental allergens. Treatment includes antihistamines and avoidance of allergens.",
+    "ringworm": "Ringworm is a contagious fungal infection that causes circular patches of hair loss and scaly skin. Treatment includes antifungal creams, shampoos, and environmental cleaning."
+}
+
+# ---------------------------
+# 5. Streamlit UI
+# ---------------------------
+st.title("🐶 Dog Skin Disease Classifier (CNN + Random Forest)")
 st.write("Upload an image of a dog's skin to predict the disease type.")
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg","jpeg","png"])
@@ -59,6 +71,11 @@ if uploaded_file is not None:
         if len(pred) > 0 and pred[0] < len(class_names):
             predicted_class = class_names[pred[0]]
             st.success(f"Prediction: **{predicted_class}**")
+
+            # Show disease information
+            if predicted_class in disease_info:
+                st.subheader("📖 Disease Information")
+                st.write(disease_info[predicted_class])
         else:
             st.error("Prediction failed. Please check your model and class names.")
     except Exception as e:
