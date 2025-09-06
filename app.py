@@ -8,9 +8,6 @@ import os
 
 st.set_page_config(page_title="Dog Skin Disease Classifier", layout="centered")
 
-# ---------------------------
-# Helpers: load models (with basic error handling)
-# ---------------------------
 @st.cache_resource
 def load_feature_extractor():
     base_model = keras.applications.MobileNetV2(
@@ -45,14 +42,10 @@ except Exception as e:
     st.error(f"Failed to load Random Forest model: {e}")
     st.stop()
 
-# ---------------------------
-# Class names
-# ---------------------------
+
 class_names = ['demodicosis', 'Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity', 'ringworm']
 
-# ---------------------------
-# Bilingual disease info
-# ---------------------------
+
 disease_info = {
     "demodicosis": {
         "en": {
@@ -254,10 +247,8 @@ disease_info = {
     }
 }
 
-# ---------------------------
-# UI
-# ---------------------------
-st.title("🐶 Dog Skin Disease Classifier (CNN + Random Forest)")
+
+st.title("🐶 Dog Skin Disease Classifier")
 st.write("Upload a dog's skin image — choose language, then predict.")
 
 language = st.radio("🌐 Select language / භාෂාව:", ["English", "සිංහල"], horizontal=True)
@@ -279,14 +270,14 @@ if uploaded_file is not None:
     img_array = np.array(img_resized).astype(np.float32)
     img_array = np.expand_dims(img_array, 0)
 
-    # Extract features
+    
     try:
         features = feature_extractor(img_array).numpy()
     except Exception as e:
         st.error(f"Feature extraction failed: {e}")
         st.stop()
 
-    # Predict using RF
+    
     try:
         pred = rf_model.predict(features)
     except Exception as e:
@@ -296,7 +287,7 @@ if uploaded_file is not None:
     pred0 = pred[0]
     predicted_class = None
 
-    # Handle integer index
+   
     if isinstance(pred0, (np.integer, int)):
         idx = int(pred0)
         if 0 <= idx < len(class_names):
@@ -304,7 +295,7 @@ if uploaded_file is not None:
         else:
             predicted_class = str(pred0)
 
-    # Handle string / bytes
+
     if predicted_class is None:
         if isinstance(pred0, (bytes, np.bytes_)):
             try:
@@ -325,7 +316,7 @@ if uploaded_file is not None:
 
     st.success(f"✅ Prediction: **{predicted_class}**")
 
-    # Disease info
+
     info = disease_info.get(predicted_class)
     if info:
         content = info.get(lang_key, info.get("en"))
@@ -340,7 +331,7 @@ if uploaded_file is not None:
     else:
         st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
 
-    # Show probabilities if available
+
     if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
         try:
             probs = rf_model.predict_proba(features)[0]
@@ -356,3 +347,4 @@ if uploaded_file is not None:
                 st.write(f"- {c}: {p:.2%}")
         except Exception:
             pass
+
