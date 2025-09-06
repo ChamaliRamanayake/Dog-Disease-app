@@ -32,7 +32,7 @@ def load_rf_model(path="dog_skin_rf_model.pkl"):
         raise FileNotFoundError(f"Random Forest model file not found at: {path}")
     return joblib.load(path)
 
-# Load models (show spinner if slow)
+# Load models
 try:
     feature_extractor = load_feature_extractor()
 except Exception as e:
@@ -46,13 +46,12 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# Class names (if your RF outputs indices these are used)
-# If your RF already outputs class-name strings, we handle that below.
+# Class names
 # ---------------------------
 class_names = ['demodicosis', 'Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity', 'ringworm']
 
 # ---------------------------
-# Bilingual disease info (English + Sinhala)
+# Bilingual disease info
 # ---------------------------
 disease_info = {
     "demodicosis": {
@@ -265,7 +264,6 @@ language = st.radio("🌐 Select language / භාෂාව:", ["English", "ස�
 lang_key = "en" if language == "English" else "si"
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-show_debug = st.checkbox("Show debug info (raw model output)")
 
 if uploaded_file is not None:
     try:
@@ -276,78 +274,61 @@ if uploaded_file is not None:
 
     st.image(img, caption="Uploaded Image", use_container_width=True)
 
-    # Preprocess (use numpy to avoid deprecated keras.preprocessing warnings)
+    # Preprocess
     img_resized = img.resize((224, 224))
     img_array = np.array(img_resized).astype(np.float32)
-    img_array = np.expand_dims(img_array, 0)  # shape (1, 224, 224, 3)
+    img_array = np.expand_dims(img_array, 0)
 
     # Extract features
     try:
-        features = feature_extractor(img_array).numpy()  # shape (1, features_dim)
+        features = feature_extractor(img_array).numpy()
     except Exception as e:
         st.error(f"Feature extraction failed: {e}")
         st.stop()
 
     # Predict using RF
     try:
-        pred = rf_model.predict(features)  # could be int indices or string labels
+        pred = rf_model.predict(features)
     except Exception as e:
         st.error(f"Prediction failed: {e}")
         st.stop()
 
-    if show_debug:
-        st.write("Raw prediction output:", pred)
-
-    # handle different possible prediction outputs
     pred0 = pred[0]
     predicted_class = None
 
-    # If RF returns numeric index:
-    try:
-        if isinstance(pred0, (np.integer, int)):
-            idx = int(pred0)
-            if 0 <= idx < len(class_names):
-                predicted_class = class_names[idx]
-            else:
-                # numeric but out of range
-                predicted_class = str(pred0)
-    except Exception:
-        pass
+    # Handle integer index
+    if isinstance(pred0, (np.integer, int)):
+        idx = int(pred0)
+        if 0 <= idx < len(class_names):
+            predicted_class = class_names[idx]
+        else:
+            predicted_class = str(pred0)
 
-    # If RF returns bytes (python2 pickles) or numpy bytes_:
+    # Handle string / bytes
     if predicted_class is None:
-        try:
-            # convert bytes to str
-            if isinstance(pred0, (bytes, np.bytes_)):
+        if isinstance(pred0, (bytes, np.bytes_)):
+            try:
                 pred0 = pred0.decode("utf-8")
-        except Exception:
-            pass
-
-        # if pred0 matches a known class name, use it
+            except Exception:
+                pass
         if isinstance(pred0, str) and pred0 in class_names:
             predicted_class = pred0
         else:
-            # If pred0 is string but not exactly one of the class_names,
-            # try simple normalization to match keys in disease_info
             if isinstance(pred0, str):
                 normalized = pred0.strip()
-                # some label encoders might produce lowercase or underscores; try matching keys:
                 for key in disease_info.keys():
                     if normalized.lower() == key.lower():
                         predicted_class = key
                         break
-
-    # final fallback: if still None, just stringify pred0
     if predicted_class is None:
         predicted_class = str(pred0)
 
     st.success(f"✅ Prediction: **{predicted_class}**")
 
-    # show bilingual disease info if available
+    # Disease info
     info = disease_info.get(predicted_class)
     if info:
         content = info.get(lang_key, info.get("en"))
-        # Show title, description, symptoms, treatment in bullet lists
         st.subheader(content.get("title", predicted_class))
         st.write(content.get("description", ""))
         st.markdown("**🐾 Common Symptoms**")
@@ -359,22 +340,19 @@ if uploaded_file is not None:
     else:
         st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
 
-    # show probability (optional) if RF supports predict_proba and classes_
+    # Show probabilities if available
     if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
         try:
             probs = rf_model.predict_proba(features)[0]
             classes = rf_model.classes_
-            # build display mapping (convert bytes to str if necessary)
             display_pairs = []
             for c, p in zip(classes, probs):
                 if isinstance(c, bytes):
                     c = c.decode("utf-8")
                 display_pairs.append((str(c), float(p)))
-            # sort by probability desc and show top 3
             display_pairs.sort(key=lambda x: x[1], reverse=True)
             st.markdown("**Model confidences (top 3):**")
             for c, p in display_pairs[:3]:
                 st.write(f"- {c}: {p:.2%}")
         except Exception:
-            # silent pass if predict_proba fails
             pass
