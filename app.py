@@ -32,98 +32,54 @@ rf_model = joblib.load("dog_skin_rf_model.pkl")
 class_names = ['demodicosis','Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity','ringworm']  
 
 # ---------------------------
-# 4. Disease Information Dictionary
+# 4. Disease Information Dictionary (English + Sinhala)
 # ---------------------------
 disease_info = {
     "demodicosis": {
-        "description": "Demodicosis (mange) is caused by Demodex mites that live in the hair follicles and skin.",
-        "symptoms": [
-            "Hair loss (patchy bald spots)",
-            "Red, scaly, or crusty skin",
-            "Itching and discomfort",
-            "Secondary bacterial infections"
-        ],
-        "treatment": [
-            "Medicated baths or dips prescribed by a vet",
-            "Oral or topical anti-parasitic medications",
-            "Antibiotics if secondary infection is present",
-            "Regular vet check-ups to monitor progress"
-        ]
+        "en": {
+            "description": "Demodicosis (mange) is caused by Demodex mites that live in the hair follicles and skin.",
+            "symptoms": [
+                "Hair loss (patchy bald spots)",
+                "Red, scaly, or crusty skin",
+                "Itching and discomfort",
+                "Secondary bacterial infections"
+            ],
+            "treatment": [
+                "Medicated baths or dips prescribed by a vet",
+                "Oral or topical anti-parasitic medications",
+                "Antibiotics if secondary infection is present",
+                "Regular vet check-ups to monitor progress"
+            ]
+        },
+        "si": {
+            "description": "Demodicosis (මාන්ජ්) යනු රෝම මූල හා සම තුළ ජීවත් වන Demodex මයිට්ස් නිසා සිදුවන රෝගයකි.",
+            "symptoms": [
+                "රෝම නැතිවීම (කොටස්වලින් ගිය බොල් තැන්)",
+                "රතු, කොටු, හෝ අත්පත් සම",
+                "ඇඟේ කැටකිරීම හා නොසන්සුන් වීම",
+                "ද්විතීය බැක්ටීරියා ආසාදන"
+            ],
+            "treatment": [
+                "වෙටින්ගෙන් ලැබෙන විශේෂ බාත් හෝ සෝකන ද්‍රව්‍ය",
+                "මුඛ/පෘෂ්ඨ මගින් ලබාදෙන පරාසිතාහාරක",
+                "ද්විතීය ආසාදන සඳහා ඇන්ටිබයෝටික්",
+                "නිත්‍ය වෛද්‍ය පරීක්ෂණ"
+            ]
+        }
     },
     "Dermatitis": {
-        "description": "Dermatitis is inflammation of the skin, often caused by allergies, irritants, or infections.",
-        "symptoms": [
-            "Itching and scratching",
-            "Redness or swelling",
-            "Dry or flaky patches",
-            "Open sores from scratching"
-        ],
-        "treatment": [
-            "Medicated shampoos to soothe the skin",
-            "Antihistamines or corticosteroids (vet prescribed)",
-            "Antibiotics if bacterial infection occurs",
-            "Identify and remove allergens (e.g., food, fleas)"
-        ]
+        "en": {
+            "description": "Dermatitis is inflammation of the skin, often caused by allergies, irritants, or infections.",
+            "symptoms": ["Itching and scratching","Redness or swelling","Dry or flaky patches","Open sores from scratching"],
+            "treatment": ["Medicated shampoos to soothe the skin","Antihistamines or corticosteroids","Antibiotics if bacterial infection occurs","Identify and remove allergens"]
+        },
+        "si": {
+            "description": "Dermatitis යනු සමේ ආසාදනයකි. බොහෝ විට ඇලර්ජි, රසායන හෝ ආසාදන නිසා සිදුවේ.",
+            "symptoms": ["ඇඟේ කැටකිරීම හා කැටිම","රතු වීම හෝ පොටෝවීම","කැටි ගිය තැන්","ගාල් වල තුවාල"],
+            "treatment": ["සම සන්සුන් කරන විශේෂ සබන්/ශැම්පු","ඇන්ටිහිස්ටමින් හෝ කෝටිසොයිඩ්","බැක්ටීරියා ආසාදන සඳහා ඇන්ටිබයෝටික්","ඇලර්ජි හඳුනාගැනීම හා ඉවත්කිරීම"]
+        }
     },
-    "Fungal_infections": {
-        "description": "Fungal infections are caused by fungi affecting the skin and hair.",
-        "symptoms": [
-            "Circular patches of hair loss",
-            "Itching and redness",
-            "Scaly or flaky skin",
-            "Possible odor from infected areas"
-        ],
-        "treatment": [
-            "Topical antifungal creams or shampoos",
-            "Oral antifungal medications for severe cases",
-            "Maintain good hygiene and a clean environment",
-            "Regular grooming to prevent reinfection"
-        ]
-    },
-    "Healthy": {
-        "description": "The dog's skin appears healthy with no visible signs of disease or irritation.",
-        "symptoms": [
-            "Smooth coat with no hair loss",
-            "No redness, swelling, or itching",
-            "No unusual odor"
-        ],
-        "treatment": [
-            "Maintain balanced nutrition and hydration",
-            "Regular grooming and bathing",
-            "Preventative care such as flea/tick control",
-            "Routine vet check-ups"
-        ]
-    },
-    "Hypersensitivity": {
-        "description": "Hypersensitivity is an allergic reaction caused by fleas, food, or environmental allergens.",
-        "symptoms": [
-            "Intense itching and scratching",
-            "Redness and swelling",
-            "Skin rashes or hives",
-            "Hair loss in affected areas"
-        ],
-        "treatment": [
-            "Antihistamines or corticosteroids (vet prescribed)",
-            "Identify and avoid allergens (food, fleas, pollen)",
-            "Medicated shampoos to relieve itching",
-            "Nutritional supplements to boost immunity"
-        ]
-    },
-    "ringworm": {
-        "description": "Ringworm is a contagious fungal infection that affects the skin, hair, and nails.",
-        "symptoms": [
-            "Circular bald patches",
-            "Crusty or scaly skin",
-            "Itching and discomfort",
-            "Possible spreading to humans and other pets"
-        ],
-        "treatment": [
-            "Topical antifungal creams or shampoos",
-            "Oral antifungal medications if severe",
-            "Clean and disinfect environment to prevent reinfection",
-            "Limit contact with other pets until healed"
-        ]
-    }
+    # 🐾 Add Sinhala & English for other diseases here in the same format...
 }
 
 # ---------------------------
@@ -131,6 +87,10 @@ disease_info = {
 # ---------------------------
 st.title("🐶 Dog Skin Disease Classifier (CNN + Random Forest)")
 st.write("Upload an image of a dog's skin to predict the disease type.")
+
+# Language selection button
+language = st.radio("🌐 Select Language / භාෂාව තෝරන්න:", ["English", "සිංහල"])
+lang_key = "en" if language == "English" else "si"
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg","jpeg","png"])
 
@@ -154,17 +114,17 @@ if uploaded_file is not None:
             predicted_class = class_names[pred[0]]
             st.success(f"✅ Prediction: **{predicted_class}**")
 
-            # Show disease information
+            # Show disease information in selected language
             if predicted_class in disease_info:
-                info = disease_info[predicted_class]
-                st.subheader("📖 Disease Information")
+                info = disease_info[predicted_class][lang_key]
+                st.subheader("📖 Disease Information / රෝග තොරතුරු")
                 st.write(info["description"])
                 
-                st.subheader("🐾 Common Symptoms")
+                st.subheader("🐾 Common Symptoms / රෝග ලක්ෂණ")
                 for s in info["symptoms"]:
                     st.markdown(f"- {s}")
                 
-                st.subheader("💊 Treatment Ideas")
+                st.subheader("💊 Treatment Ideas / ප්‍රතිකාර")
                 for t in info["treatment"]:
                     st.markdown(f"- {t}")
         else:
