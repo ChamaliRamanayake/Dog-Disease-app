@@ -257,9 +257,8 @@ lang_key = "en" if language == "English" else "si"
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# --- Check if user uploaded the "wrong" image ---
 if uploaded_file is not None:
-    blocked_files = ["images (1).jpeg", "records.png", "cover.PNG" , "image2.png"]  # files to block
+    blocked_files = ["images (1).jpeg", "records.png", "cover.PNG" , "image2.png"]
     if uploaded_file.name in blocked_files:
         st.error("❌ This image is not allowed. Please upload a valid dog skin image.")
         st.stop()
@@ -272,7 +271,7 @@ if uploaded_file is not None:
 
     st.image(img, caption="Uploaded Image", use_container_width=True)
 
-    # --- Preprocess ---
+    # Preprocess
     try:
         img_resized = img.resize((224, 224))
         img_array = np.array(img_resized).astype(np.float32)
@@ -281,40 +280,32 @@ if uploaded_file is not None:
         st.error(f"Image preprocessing failed: {e}")
         st.stop()
 
-    # --- Feature extraction ---
+    # Feature extraction
     try:
         features = feature_extractor(img_array).numpy()
     except Exception as e:
         st.error(f"Feature extraction failed: {e}")
         st.stop()
 
-    # --- Prediction ---
+    # Prediction
     try:
         pred = rf_model.predict(features)
     except Exception as e:
         st.error(f"Prediction failed: {e}")
         st.stop()
 
-    # Map prediction to class name
+    # Map prediction to class
     pred0 = pred[0]
-    predicted_class = None
-
-    if isinstance(pred0, (np.integer, int)):
-        idx = int(pred0)
-        if 0 <= idx < len(class_names):
-            predicted_class = class_names[idx]
-        else:
-            predicted_class = str(pred0)
-
-    if predicted_class is None:
-        if isinstance(pred0, str) and pred0 in class_names:
-            predicted_class = pred0
-        else:
-            predicted_class = str(pred0)
+    if isinstance(pred0, (np.integer, int)) and 0 <= int(pred0) < len(class_names):
+        predicted_class = class_names[int(pred0)]
+    elif isinstance(pred0, str) and pred0 in class_names:
+        predicted_class = pred0
+    else:
+        predicted_class = str(pred0)
 
     st.success(f"✅ Prediction: **{predicted_class}**")
 
-    # --- Display disease info ---
+    # Display disease info
     info = disease_info.get(predicted_class)
     if info:
         content = info.get(lang_key, info.get("en"))
@@ -328,28 +319,3 @@ if uploaded_file is not None:
             st.markdown(f"- {t}")
     else:
         st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
-
-    # --- Show model confidence ---
-    if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
-        try:
-            probs = rf_model.predict_proba(features)[0]
-            classes = rf_model.classes_
-            display_pairs = []
-            for c, p in zip(classes, probs):
-                if isinstance(c, bytes):
-                    c = c.decode("utf-8")
-                display_pairs.append((str(c), float(p)))
-            display_pairs.sort(key=lambda x: x[1], reverse=True)
-            st.markdown("**Model confidences (top 3):**")
-            for c, p in display_pairs[:3]:
-                st.write(f"- {c}: {p:.2%}")
-        except Exception:
-            pass
-
-
-
-
-
-
-
-
