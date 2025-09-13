@@ -330,21 +330,22 @@ if uploaded_file is not None:
         st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
 
     # --- Show model confidence ---
-    if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
-        try:
-            probs = rf_model.predict_proba(features)[0]
-            classes = rf_model.classes_
-            display_pairs = []
-            for c, p in zip(classes, probs):
-                if isinstance(c, bytes):
-                    c = c.decode("utf-8")
-                display_pairs.append((str(c), float(p)))
-            display_pairs.sort(key=lambda x: x[1], reverse=True)
-            st.markdown("**Model confidences (top 3):**")
-            for c, p in display_pairs[:3]:
-                st.write(f"- {c}: {p:.2%}")
+    # if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
+    #     try:
+    #         probs = rf_model.predict_proba(features)[0]
+    #         classes = rf_model.classes_
+    #         display_pairs = []
+    #         for c, p in zip(classes, probs):
+    #             if isinstance(c, bytes):
+    #                 c = c.decode("utf-8")
+    #             display_pairs.append((str(c), float(p)))
+    #         display_pairs.sort(key=lambda x: x[1], reverse=True)
+    #         st.markdown("**Model confidences (top 3):**")
+    #         for c, p in display_pairs[:3]:
+    #             st.write(f"- {c}: {p:.2%}")
         except Exception:
             pass
+
 
 
 
