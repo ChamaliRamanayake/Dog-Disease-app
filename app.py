@@ -4,12 +4,11 @@ from tensorflow import keras
 import numpy as np
 import joblib
 from PIL import Image
+import os
 
 st.set_page_config(page_title="Dog Skin Disease Classifier", layout="centered")
 
-# ---------------------------
-# Load Feature Extractor
-# ---------------------------
+# --- Load Models ---
 @st.cache_resource
 def load_feature_extractor():
     base_model = keras.applications.MobileNetV2(
@@ -18,137 +17,250 @@ def load_feature_extractor():
         weights="imagenet"
     )
     base_model.trainable = False
-    model = keras.Sequential([
+    feat_ext = keras.Sequential([
+        keras.layers.Rescaling(1.0 / 255),
         base_model,
         keras.layers.GlobalAveragePooling2D()
     ])
-    return model
+    return feat_ext
 
-# ---------------------------
-# Load Classifier
-# ---------------------------
 @st.cache_resource
-def load_classifier():
-    return joblib.load("dog_skin_disease_classifier.pkl")
+def load_rf_model(path="dog_skin_rf_model.pkl"):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Random Forest model file not found at: {path}")
+    return joblib.load(path)
 
-feature_extractor = load_feature_extractor()
-classifier = load_classifier()
+# Load models
+try:
+    feature_extractor = load_feature_extractor()
+except Exception as e:
+    st.error(f"Failed to load CNN feature extractor: {e}")
+    st.stop()
 
-# ---------------------------
-# Disease Information (EN + SI)
-# ---------------------------
+try:
+    rf_model = load_rf_model("dog_skin_rf_model.pkl")
+except Exception as e:
+    st.error(f"Failed to load Random Forest model: {e}")
+    st.stop()
+
+# --- Class names ---
+class_names = ['demodicosis', 'Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity', 'ringworm']
+
+# --- Disease Info Dictionary ---
 disease_info = {
-    "Atopic Dermatitis": {
+    "demodicosis": {
         "en": {
-            "title": "Atopic Dermatitis",
-            "description": "A chronic skin condition caused by allergies. Common in dogs with sensitive skin.",
-            "symptoms": ["Itching", "Redness", "Rashes", "Licking paws"],
-            "treatment": ["Antihistamines", "Special shampoos", "Avoid allergens"]
+            "title": "Demodicosis (Mange)",
+            "description": "Demodicosis is caused by Demodex mites that live in hair follicles and skin.",
+            "symptoms": [
+                "Patchy hair loss (bald spots)",
+                "Red, scaly or crusty skin",
+                "Itching and discomfort",
+                "Possible secondary bacterial infections"
+            ],
+            "treatment": [
+                "Medicated dips or baths prescribed by a veterinarian",
+                "Oral or topical anti-parasitic medications",
+                "Antibiotics if a secondary infection is present",
+                "Follow-up vet checks to monitor recovery"
+            ]
         },
         "si": {
-            "title": "ඇටොපික් ඩර්මටයිටිස්",
-            "description": "ඇලර්ජි හේතුවෙන් ඇතිවන දිගුකාලීන තත්ත්වයක්. සංවේදී සම ඇති බල්ලාට සාමාන්‍යය.",
-            "symptoms": ["කිරිකිරීම", "රතු පැහැමත් වීම", "කුරුළු", "පාද ලිහාම"],
-            "treatment": ["ඇන්ටිහිස්ටමින්", "විශේෂ ෂැම්පු", "ඇලර්ජි වලක්වීම"]
+            "title": "Demodicosis (මාන්ජ්)",
+            "description": "Demodicosis යනු Demodex මයිට්ස් නිසා සිදෙන රෝගයකි—රෝම මූල හා සමට බලපායි.",
+            "symptoms": [
+                "රෝම නොවී කොටස් වශයෙන් හිස්වීම",
+                "රතු, කොටු හෝ දුඹුරු සම",
+                "කැටිම සහ අසනීපතාව",
+                "දෙවනික බැක්ටීරියා ආසාදන ඇති විය හැක"
+            ],
+            "treatment": [
+                "වෙට්ටන් විසින් නියම කරන ලද බාත්/ඩිප්",
+                "මුඛ/පෘෂ්ඨ අඩවි මඟින් පරාසිතාන්‍ය ඖෂධ",
+                "ද්විතීය ආසාදන සඳහා ඇන්ටිබයොටික්",
+                "සතිපතා වෛද්‍ය පරීක්ෂණ"
+            ]
         }
     },
-    "Flea Allergy Dermatitis": {
+    "Dermatitis": {
         "en": {
-            "title": "Flea Allergy Dermatitis",
-            "description": "Skin irritation caused by allergic reaction to flea saliva.",
-            "symptoms": ["Severe itching", "Hair loss", "Skin sores"],
-            "treatment": ["Flea control", "Topical creams", "Medications"]
+            "title": "Dermatitis",
+            "description": "Dermatitis is skin inflammation caused by allergies, irritants, or infection.",
+            "symptoms": [
+                "Itching and scratching",
+                "Redness and swelling",
+                "Dry or flaky patches",
+                "Open sores from intense scratching"
+            ],
+            "treatment": [
+                "Medicated shampoos to soothe skin",
+                "Antihistamines or corticosteroids (vet prescribed)",
+                "Antibiotics if bacterial infection is present",
+                "Identify and remove allergens (food/fleas/environmental)"
+            ]
         },
         "si": {
-            "title": "පිලිස්සා ඇලර්ජි ඩර්මටයිටිස්",
-            "description": "පිලිස්සා හිතකලාමට ඇතිවන සමේ ඇලර්ජි.",
-            "symptoms": ["ඉතාමත් කිරිම", "ඇළු වැටීම", "සමේ පිටුසුන්"],
-            "treatment": ["පිලිස්සා පාලනය", "ප්‍රාදේශීය ක්‍රීම්", "ඖෂධ"]
+            "title": "Dermatitis (ස්කින් දුෂ්ඨතාවය)",
+            "description": "Dermatitis යනු ඇලර්ජි, ආශිලක හෝ ආසාදන වැනි හේතු මත සිදුවන සමේ දායමකි.",
+            "symptoms": [
+                "කැටිම හා පිරිම්පීම",
+                "රතු වීම සහ ද්‍රවත්වීම",
+                "කැකුළු හෝ ගැඹුරු තැන්",
+                "ගැටිම නිසා ඇතිවන තුවාල"
+            ],
+            "treatment": [
+                "සම සන්සුන් කරන ශැම්පු හා බාත්",
+                "ඇන්ටිහිස්ටමිනයන් හෝ කොටිසොයිඩ් (වෙට් නියමිත)",
+                "බැක්ටීරියා ආසාදන ඇත්නම් ඇන්ටිබයොටික්",
+                "ඇලර්ජි හඳුනාගෙන ඉවත් කිරීම"
+            ]
         }
     },
-    "Pyoderma": {
+    "Fungal_infections": {
         "en": {
-            "title": "Pyoderma",
-            "description": "A bacterial skin infection common in dogs.",
-            "symptoms": ["Pus-filled lesions", "Hair loss", "Red bumps"],
-            "treatment": ["Antibiotics", "Medicated shampoos"]
+            "title": "Fungal Infections",
+            "description": "Skin fungal infections (e.g. ringworm-like infections) cause patches of hair loss and scaling.",
+            "symptoms": [
+                "Circular or irregular patches of hair loss",
+                "Itching and redness",
+                "Scaly or flaky skin",
+                "Sometimes unpleasant odor"
+            ],
+            "treatment": [
+                "Topical antifungal creams or medicated shampoos",
+                "Oral antifungal medication for widespread cases",
+                "Clean and disinfect bedding and environment",
+                "Keep the pet dry and well-groomed"
+            ]
         },
         "si": {
-            "title": "පියෝඩර්මා",
-            "description": "බැක්ටීරියා හේතුවෙන් ඇතිවන බල්ලාගේ සමේ ආසාදනය.",
-            "symptoms": ["පුපුරු පිරුණු घා", "ඇළු වැටීම", "රතු ගැටලු"],
-            "treatment": ["ඇන්ටිබයෝටික්", "ඖෂධ ෂැම්පු"]
+            "title": "බීජාණු ආසාදන",
+            "description": "බීජාණු ආසාදන (දෘශ්‍ය වශයෙන් රවුම් වර්ගයේ) සමේ රෝම නැතිවීම් සහ පසුබැසීම සිදු කරයි.",
+            "symptoms": [
+                "රවුම් හෝ අනියමිත රෝම නැතිකිරීම්",
+                "කැටිම සහ රතු වීම",
+                "කැකිළි හෝ උඩිමැටි සම",
+                "නියම නොවන ගන්දරයක් ඇති විය හැක"
+            ],
+            "treatment": [
+                "පෘෂ්ඨ/කැලෑම antifungal කිරිම්",
+                "වයාපෘති අවස්ථාවන්හි මුඛ ඖෂධ",
+                "බැඩින් සහ පරිසරය පිරිසිදු කිරීම",
+                "වැසි නැති හා සුදුසු ගෘහ පරිපාලනය"
+            ]
         }
     },
-    "Mange": {
+    "Healthy": {
         "en": {
-            "title": "Mange",
-            "description": "Caused by parasitic mites. Very itchy and contagious.",
-            "symptoms": ["Hair loss", "Severe itching", "Crusty skin"],
-            "treatment": ["Medicated dips", "Anti-parasitic drugs"]
+            "title": "Healthy Skin",
+            "description": "No visible signs of disease. Skin and coat appear normal.",
+            "symptoms": [
+                "Full, glossy coat",
+                "No redness, sores or scaling",
+                "No persistent itching"
+            ],
+            "treatment": [
+                "Balanced diet and hydration",
+                "Regular grooming and flea/tick prevention",
+                "Routine vet check-ups"
+            ]
         },
         "si": {
-            "title": "මැන්ජ්",
-            "description": "පරපෝෂී මයිට් හේතුවෙන් ඇතිවෙන තත්ත්වයක්. ඉතාමත් කිරිම සහ සම්පූර්ණව ආසාදිතයි.",
-            "symptoms": ["ඇළු වැටීම", "ඉතාමත් කිරිම", "පිටුසුන් සම"],
-            "treatment": ["ඖෂධ නානවා", "පරපෝෂී විරෝධී ඖෂධ"]
+            "title": "සෞඛ්‍ය සම්පුර්ණ සම",
+            "description": "කිසිදු පෙනෙන රෝග ලක්ෂණ නොමැති අතර සම හා රෝම සාමාන්‍ය ලෙස පෙනේ.",
+            "symptoms": [
+                "සම්පූර්ණ සහ මිහිරි රෝම",
+                "රතුකිරීම, තුවාල හෝ කැකිළි නොමැති වීම",
+                "පාහේ කැටිමක් නොමැති වීම"
+            ],
+            "treatment": [
+                "සමබැඳි ආහාර හා ජලය",
+                "නිතිපතා සොබාදහමින් සෝදන හා පිරිසිදු කිරීම",
+                "නිති වෛද්‍ය පරීක්ෂණ"
+            ]
         }
     },
-    "Ringworm": {
+    "Hypersensitivity": {
+        "en": {
+            "title": "Hypersensitivity (Allergy)",
+            "description": "Allergic reactions to fleas, food, or environmental allergens causing skin problems.",
+            "symptoms": [
+                "Severe itching and scratching",
+                "Redness, rashes or hives",
+                "Hair loss in irritated areas",
+                "Secondary infections may occur"
+            ],
+            "treatment": [
+                "Antihistamines or steroids prescribed by a vet",
+                "Flea control if fleas are the cause",
+                "Elimination diet to identify food allergies",
+                "Medicated shampoos and topical care"
+            ]
+        },
+        "si": {
+            "title": "හයිපර් සේන්සිටිවිටි (ඇලර්ජි)",
+            "description": "පිළිකිලි, ආහාර හෝ පරිසරික ඇලර්ජි මඟින් ඇතිවන සම ප්‍රතිචාර.",
+            "symptoms": [
+                "තිව්‍ර කැටිම හා පිරිම්පීම",
+                "රතුකිරීම, රැස් වීම හෝ හයිව්ස්",
+                "බලාගන hair නැතිවීම",
+                "දෙවනික ආසාදන ඇති විය හැක"
+            ],
+            "treatment": [
+                "වෙට් නියමිත ඇන්ටිහිස්ටමින් හෝ ස්ටෙරොයිඩ්",
+                "පිළිකිලි පාලනය (නිසා නම්)",
+                "ආහාර හඳුනාගැනීම සඳහා අහාර හැරීමේ පරීක්ෂණ",
+                "ශැම්පු සහ තවත් topical ප්‍රතිකාර"
+            ]
+        }
+    },
+    "ringworm": {
         "en": {
             "title": "Ringworm",
-            "description": "A fungal infection causing circular patches of hair loss.",
-            "symptoms": ["Round hair loss patches", "Scaling skin", "Redness"],
-            "treatment": ["Antifungal medication", "Topical creams"]
+            "description": "Ringworm is a contagious fungal infection that affects skin and hair.",
+            "symptoms": [
+                "Circular bald patches",
+                "Scaly, crusty skin",
+                "Itching and possible spread to other animals/humans"
+            ],
+            "treatment": [
+                "Topical antifungal creams/shampoos",
+                "Oral antifungals for extensive cases",
+                "Disinfect environment and isolate infected pets",
+                "Wash bedding and toys frequently"
+            ]
         },
         "si": {
-            "title": "රින්ග්වොම්",
-            "description": "සංක්‍රාමක අලිපැල්ලම හේතුවෙන් ඇතිවෙන සමේ ආසාදනය.",
-            "symptoms": ["වටා ඇළු වැටීම", "සමේ පිටුසුන්", "රතු පැහැය"],
-            "treatment": ["අලිපැල්ලම නසා දැමීමේ ඖෂධ", "ප්‍රාදේශීය ක්‍රීම්"]
-        }
-    },
-    "Yeast Infection": {
-        "en": {
-            "title": "Yeast Infection",
-            "description": "Caused by yeast overgrowth, leading to skin irritation.",
-            "symptoms": ["Odor", "Itching", "Greasy skin"],
-            "treatment": ["Antifungal shampoos", "Topical creams"]
-        },
-        "si": {
-            "title": "ඉස්ත සන්ක්‍රමණය",
-            "description": "ඉස්ත අධික වීම හේතුවෙන් ඇතිවෙන සමේ දෝෂ.",
-            "symptoms": ["ගඳ", "කිරිම", "පෙතක් සම"],
-            "treatment": ["අලිපැල්ලම නසා දැමීමේ ෂැම්පු", "ප්‍රාදේශීය ක්‍රීම්"]
+            "title": "Ringworm (චක්රාරූපී ආසාදනය)",
+            "description": "Ringworm යනු සන්ක්‍රමණීය බීජාණු ආසාදනයකි, සම සහ රෝම ක්ෂේම කරයි.",
+            "symptoms": [
+                "රවුම් හිස් තැන්",
+                "කැකිළි සහ දුඹුරු සම",
+                "කැටිම සහ අන් සතුන්/මිනිසුන් වෙත පැතිරීම"
+            ],
+            "treatment": [
+                "පෘෂ්ඨ antifungal කිරිම/ශැම්පු",
+                "විශාල අවශ්‍යතාවයකදී මුඛ antifungal ඖෂධ",
+                "පරිසරය පිරිසිදු කිරීම හා ආසාදිත සතුන් වෙන් කිරීම",
+                "බැදි, ක්‍රීඩා ද්‍රව්‍ය නිතර සෝදන්න"
+            ]
         }
     }
 }
 
-# ---------------------------
-# Preprocess Function
-# ---------------------------
-def preprocess_image(image):
-    img = image.resize((224, 224))
-    img_array = keras.preprocessing.image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    return keras.applications.mobilenet_v2.preprocess_input(img_array)
-
-# ---------------------------
-# UI
-# ---------------------------
+# --- Streamlit UI ---
 st.title("🐶 Dog Skin Disease Classifier")
-st.write("Upload a dog skin image to predict the disease and get treatment ideas.")
+st.write("Upload a dog's skin image — choose language, then predict.")
 
-# Language selection
-language = st.radio("Select Language / භාෂාව තෝරන්න", ["English", "සිංහල"])
-lang_key = "si" if language == "සිංහල" else "en"
+language = st.radio("🌐 Select language / භාෂාව:", ["English", "සිංහල"], horizontal=True)
+lang_key = "en" if language == "English" else "si"
 
-# Upload image
-uploaded_file = st.file_uploader("Upload Dog Skin Image", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# Block unwanted files
+# --- Check if user uploaded the "wrong" image ---
 if uploaded_file is not None:
-    if uploaded_file.name in ["images (1).jpeg", "record.png"]:
+    blocked_files = ["images (1).jpeg", "record.png"]  # files to block
+    if uploaded_file.name in blocked_files:
         st.error("❌ This image is not allowed. Please upload a valid dog skin image.")
         st.stop()
     else:
@@ -158,40 +270,55 @@ if uploaded_file is not None:
             st.error(f"Cannot open the uploaded file as an image: {e}")
             st.stop()
 
-        st.image(img, caption="Uploaded Image", use_container_width=True)
+    st.image(img, caption="Uploaded Image", use_container_width=True)
 
-        # Preprocess & predict
-        img_array = preprocess_image(img)
-        features = feature_extractor.predict(img_array)
-        prediction = classifier.predict(features)
-        predicted_class = classifier.classes_[np.argmax(prediction)]
+    # --- Preprocess ---
+    try:
+        img_resized = img.resize((224, 224))
+        img_array = np.array(img_resized).astype(np.float32)
+        img_array = np.expand_dims(img_array, 0)
+    except Exception as e:
+        st.error(f"Image preprocessing failed: {e}")
+        st.stop()
 
-        st.success(f"✅ Predicted Disease: {predicted_class}")
+    # --- Feature extraction ---
+    try:
+        features = feature_extractor(img_array).numpy()
+    except Exception as e:
+        st.error(f"Feature extraction failed: {e}")
+        st.stop()
 
-        # Show predicted disease info
-        info = disease_info.get(predicted_class)
-        if info:
-            content = info.get(lang_key, info.get("en"))
-            st.subheader(content.get("title", predicted_class))
-            st.write(content.get("description", ""))
-            st.markdown("**🐾 Common Symptoms**")
-            for s in content.get("symptoms", []):
-                st.markdown(f"- {s}")
-            st.markdown("**💊 Treatment Ideas**")
-            for t in content.get("treatment", []):
-                st.markdown(f"- {t}")
+    # --- Prediction ---
+    try:
+        pred = rf_model.predict(features)
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
+        st.stop()
+
+    # Map prediction to class name
+    pred0 = pred[0]
+    predicted_class = None
+
+    if isinstance(pred0, (np.integer, int)):
+        idx = int(pred0)
+        if 0 <= idx < len(class_names):
+            predicted_class = class_names[idx]
         else:
-            st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
+            predicted_class = str(pred0)
 
-# ---------------------------
-# Reference Section
-# ---------------------------
-st.divider()
-st.subheader("📖 Disease Information (Reference)")
+    if predicted_class is None:
+        if isinstance(pred0, str) and pred0 in class_names:
+            predicted_class = pred0
+        else:
+            predicted_class = str(pred0)
 
-for key, langs in disease_info.items():
-    content = langs.get(lang_key, langs.get("en"))
-    with st.expander(content.get("title", key)):
+    st.success(f"✅ Prediction: **{predicted_class}**")
+
+    # --- Display disease info ---
+    info = disease_info.get(predicted_class)
+    if info:
+        content = info.get(lang_key, info.get("en"))
+        st.subheader(content.get("title", predicted_class))
         st.write(content.get("description", ""))
         st.markdown("**🐾 Common Symptoms**")
         for s in content.get("symptoms", []):
@@ -199,3 +326,22 @@ for key, langs in disease_info.items():
         st.markdown("**💊 Treatment Ideas**")
         for t in content.get("treatment", []):
             st.markdown(f"- {t}")
+    else:
+        st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
+
+    # --- Show model confidence ---
+    if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
+        try:
+            probs = rf_model.predict_proba(features)[0]
+            classes = rf_model.classes_
+            display_pairs = []
+            for c, p in zip(classes, probs):
+                if isinstance(c, bytes):
+                    c = c.decode("utf-8")
+                display_pairs.append((str(c), float(p)))
+            display_pairs.sort(key=lambda x: x[1], reverse=True)
+            st.markdown("**Model confidences (top 3):**")
+            for c, p in display_pairs[:3]:
+                st.write(f"- {c}: {p:.2%}")
+        except Exception:
+            pass
