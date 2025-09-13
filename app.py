@@ -8,6 +8,7 @@ import os
 
 st.set_page_config(page_title="Dog Skin Disease Classifier", layout="centered")
 
+# --- Load Models ---
 @st.cache_resource
 def load_feature_extractor():
     base_model = keras.applications.MobileNetV2(
@@ -42,10 +43,10 @@ except Exception as e:
     st.error(f"Failed to load Random Forest model: {e}")
     st.stop()
 
-
+# --- Class names ---
 class_names = ['demodicosis', 'Dermatitis', 'Fungal_infections', 'Healthy', 'Hypersensitivity', 'ringworm']
 
-
+# --- Disease Info Dictionary ---
 disease_info = {
     "demodicosis": {
         "en": {
@@ -247,7 +248,7 @@ disease_info = {
     }
 }
 
-
+# --- Streamlit UI ---
 st.title("🐶 Dog Skin Disease Classifier")
 st.write("Upload a dog's skin image — choose language, then predict.")
 
@@ -255,96 +256,95 @@ language = st.radio("🌐 Select language / භාෂාව:", ["English", "ස�
 lang_key = "en" if language == "English" else "si"
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+test_image_path = "images (1).jpeg"
 
-if uploaded_file is not None:
+# Handle image
+if uploaded_file is None:
+    st.warning("No image uploaded. Using test image for demonstration...")
+    try:
+        img = Image.open(test_image_path).convert("RGB")
+    except Exception as e:
+        st.error(f"Cannot open the hardcoded test image: {e}")
+        st.stop()
+else:
     try:
         img = Image.open(uploaded_file).convert("RGB")
     except Exception as e:
         st.error(f"Cannot open the uploaded file as an image: {e}")
         st.stop()
 
-    st.image(img, caption="Uploaded Image", use_container_width=True)
+st.image(img, caption="Uploaded Image", use_container_width=True)
 
-    # Preprocess
+# --- Preprocess ---
+try:
     img_resized = img.resize((224, 224))
     img_array = np.array(img_resized).astype(np.float32)
     img_array = np.expand_dims(img_array, 0)
+except Exception as e:
+    st.error(f"Image preprocessing failed: {e}")
+    st.stop()
 
-    
-    try:
-        features = feature_extractor(img_array).numpy()
-    except Exception as e:
-        st.error(f"Feature extraction failed: {e}")
-        st.stop()
+# --- Feature extraction ---
+try:
+    features = feature_extractor(img_array).numpy()
+except Exception as e:
+    st.error(f"Feature extraction failed: {e}")
+    st.stop()
 
-    
-    try:
-        pred = rf_model.predict(features)
-    except Exception as e:
-        st.error(f"Prediction failed: {e}")
-        st.stop()
+# --- Prediction ---
+try:
+    pred = rf_model.predict(features)
+except Exception as e:
+    st.error(f"Prediction failed: {e}")
+    st.stop()
 
-    pred0 = pred[0]
-    predicted_class = None
+# Map prediction to class name
+pred0 = pred[0]
+predicted_class = None
 
-   
-    if isinstance(pred0, (np.integer, int)):
-        idx = int(pred0)
-        if 0 <= idx < len(class_names):
-            predicted_class = class_names[idx]
-        else:
-            predicted_class = str(pred0)
-
-
-    if predicted_class is None:
-        if isinstance(pred0, (bytes, np.bytes_)):
-            try:
-                pred0 = pred0.decode("utf-8")
-            except Exception:
-                pass
-        if isinstance(pred0, str) and pred0 in class_names:
-            predicted_class = pred0
-        else:
-            if isinstance(pred0, str):
-                normalized = pred0.strip()
-                for key in disease_info.keys():
-                    if normalized.lower() == key.lower():
-                        predicted_class = key
-                        break
-    if predicted_class is None:
+if isinstance(pred0, (np.integer, int)):
+    idx = int(pred0)
+    if 0 <= idx < len(class_names):
+        predicted_class = class_names[idx]
+    else:
         predicted_class = str(pred0)
 
-    st.success(f"✅ Prediction: **{predicted_class}**")
-
-
-    info = disease_info.get(predicted_class)
-    if info:
-        content = info.get(lang_key, info.get("en"))
-        st.subheader(content.get("title", predicted_class))
-        st.write(content.get("description", ""))
-        st.markdown("**🐾 Common Symptoms**")
-        for s in content.get("symptoms", []):
-            st.markdown(f"- {s}")
-        st.markdown("**💊 Treatment Ideas**")
-        for t in content.get("treatment", []):
-            st.markdown(f"- {t}")
+if predicted_class is None:
+    if isinstance(pred0, str) and pred0 in class_names:
+        predicted_class = pred0
     else:
-        st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
+        predicted_class = str(pred0)
 
+st.success(f"✅ Prediction: **{predicted_class}**")
 
-    if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
-        try:
-            probs = rf_model.predict_proba(features)[0]
-            classes = rf_model.classes_
-            display_pairs = []
-            for c, p in zip(classes, probs):
-                if isinstance(c, bytes):
-                    c = c.decode("utf-8")
-                display_pairs.append((str(c), float(p)))
-            display_pairs.sort(key=lambda x: x[1], reverse=True)
-            st.markdown("**Model confidences (top 3):**")
-            for c, p in display_pairs[:3]:
-                st.write(f"- {c}: {p:.2%}")
-        except Exception:
-            pass
+# --- Display disease info ---
+info = disease_info.get(predicted_class)
+if info:
+    content = info.get(lang_key, info.get("en"))
+    st.subheader(content.get("title", predicted_class))
+    st.write(content.get("description", ""))
+    st.markdown("**🐾 Common Symptoms**")
+    for s in content.get("symptoms", []):
+        st.markdown(f"- {s}")
+    st.markdown("**💊 Treatment Ideas**")
+    for t in content.get("treatment", []):
+        st.markdown(f"- {t}")
+else:
+    st.info("No detailed info found for this predicted class. You can add details to `disease_info` dictionary.")
 
+# --- Show model confidence ---
+if hasattr(rf_model, "predict_proba") and hasattr(rf_model, "classes_"):
+    try:
+        probs = rf_model.predict_proba(features)[0]
+        classes = rf_model.classes_
+        display_pairs = []
+        for c, p in zip(classes, probs):
+            if isinstance(c, bytes):
+                c = c.decode("utf-8")
+            display_pairs.append((str(c), float(p)))
+        display_pairs.sort(key=lambda x: x[1], reverse=True)
+        st.markdown("**Model confidences (top 3):**")
+        for c, p in display_pairs[:3]:
+            st.write(f"- {c}: {p:.2%}")
+    except Exception:
+        pass
