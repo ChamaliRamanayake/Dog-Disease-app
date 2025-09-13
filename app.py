@@ -259,7 +259,7 @@ uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png
 
 # --- Check if user uploaded the "wrong" image ---
 if uploaded_file is not None:
-    blocked_files = ["images (1).jpeg", "records.png", "cover.png"]  # files to block
+    blocked_files = ["images (1).jpeg", "records.png", "cover.PNG"]  # files to block
     if uploaded_file.name in blocked_files:
         st.error("❌ This image is not allowed. Please upload a valid dog skin image.")
         st.stop()
@@ -345,6 +345,7 @@ if uploaded_file is not None:
                 st.write(f"- {c}: {p:.2%}")
         except Exception:
             pass
+
 
 
 
